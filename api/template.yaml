@@ -1,0 +1,178 @@
+Transform: AWS::Serverless-2016-10-31
+Resources:
+  TodoAppApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub
+        - ${ResourceName} From Stack ${AWS::StackName}
+        - ResourceName: TodoAppApi
+      StageName: Prod
+      DefinitionBody:
+        openapi: '3.0'
+        info: {}
+        paths:
+          /todos:
+            get:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetAllTodos.Arn}/invocations
+              responses: {}
+          /todo/{id}:
+            patch:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UpdateTodoById.Arn}/invocations
+              responses: {}
+            delete:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DeleteTodoById.Arn}/invocations
+              responses: {}
+          /todo:
+            post:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateTodo.Arn}/invocations
+              responses: {}
+      EndpointConfiguration: REGIONAL
+      TracingEnabled: true
+  GetAllTodos:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: !Sub
+        - Stack ${AWS::StackName} Function ${ResourceName}
+        - ResourceName: GetAllTodos
+      CodeUri: src/get-all-todos
+      Handler: index.handler
+      Runtime: nodejs18.x
+      MemorySize: 3008
+      Timeout: 30
+      Tracing: Active
+      Events:
+        TodoAppApiGETtodos:
+          Type: Api
+          Properties:
+            Path: /todos
+            Method: GET
+            RestApiId: !Ref TodoAppApi
+      Environment:
+        Variables:
+          TODOTABLE_TABLE_NAME: !Ref TodoTable
+          TODOTABLE_TABLE_ARN: !GetAtt TodoTable.Arn
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TodoTable
+  GetAllTodosLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${GetAllTodos}
+  UpdateTodoById:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: !Sub
+        - Stack ${AWS::StackName} Function ${ResourceName}
+        - ResourceName: UpdateTodoById
+      CodeUri: src/update-todo-by-id
+      Handler: index.handler
+      Runtime: nodejs18.x
+      MemorySize: 3008
+      Timeout: 30
+      Tracing: Active
+      Events:
+        TodoAppApiPATCHtodoid:
+          Type: Api
+          Properties:
+            Path: /todo/{id}
+            Method: PATCH
+            RestApiId: !Ref TodoAppApi
+      Environment:
+        Variables:
+          TODOTABLE_TABLE_NAME: !Ref TodoTable
+          TODOTABLE_TABLE_ARN: !GetAtt TodoTable.Arn
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TodoTable
+  UpdateTodoByIdLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${UpdateTodoById}
+  DeleteTodoById:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: !Sub
+        - Stack ${AWS::StackName} Function ${ResourceName}
+        - ResourceName: DeleteTodoById
+      CodeUri: src/delete-todo-by-id
+      Handler: index.handler
+      Runtime: nodejs18.x
+      MemorySize: 3008
+      Timeout: 30
+      Tracing: Active
+      Events:
+        TodoAppApiDELETEtodoid:
+          Type: Api
+          Properties:
+            Path: /todo/{id}
+            Method: DELETE
+            RestApiId: !Ref TodoAppApi
+      Environment:
+        Variables:
+          TODOTABLE_TABLE_NAME: !Ref TodoTable
+          TODOTABLE_TABLE_ARN: !GetAtt TodoTable.Arn
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TodoTable
+  DeleteTodoByIdLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${DeleteTodoById}
+  TodoTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+  CreateTodo:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: !Sub
+        - Stack ${AWS::StackName} Function ${ResourceName}
+        - ResourceName: CreateTodo
+      CodeUri: src/create-todo
+      Handler: index.handler
+      Runtime: nodejs18.x
+      MemorySize: 3008
+      Timeout: 30
+      Tracing: Active
+      Environment:
+        Variables:
+          TODOTABLE_TABLE_NAME: !Ref TodoTable
+          TODOTABLE_TABLE_ARN: !GetAtt TodoTable.Arn
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TodoTable
+      Events:
+        TodoAppApiPOSTtodo:
+          Type: Api
+          Properties:
+            Path: /todo
+            Method: POST
+            RestApiId: !Ref TodoAppApi
+  CreateTodoLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${CreateTodo}
